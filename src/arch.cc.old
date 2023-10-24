@@ -59,10 +59,6 @@
 */
 
 #include "vsearch.h"
-#include <random>
-#include <ctime>
-#include <iostream>
-#include <fstream>
 
 const int memalignment = 16;
 
@@ -168,50 +164,43 @@ void arch_get_user_system_time(double * user_time, double * system_time)
 
 void arch_srandom()
 {
-    // Initialize pseudo-random number generator
-    unsigned int seed = opt_randseed;
-
-    if (seed == 0) {
+  /* initialize pseudo-random number generator */
+  unsigned int seed = opt_randseed;
+  if (seed == 0)
+    {
 #ifdef _WIN32
-        // Use the current time as the seed
-        seed = static_cast<unsigned int>(std::time(nullptr));
-        srand(seed);
+      srand(GetTickCount());
 #else
-        std::random_device rd;
-        seed = rd();
-
-        try {
-            // Use /dev/urandom as the seed source
-            std::ifstream urandom("/dev/urandom", std::ios::binary);
-            if (urandom.good()) {
-                urandom.read(reinterpret_cast<char*>(&seed), sizeof(seed));
-            }
-        } catch (const std::exception& e) {
-            // Handle any errors that may occur when opening or reading from /dev/urandom
-            std::cerr << "Error opening/reading from /dev/urandom: " << e.what() << std::endl;
+      int fd = open("/dev/urandom", O_RDONLY);
+      if (fd < 0)
+        {
+          fatal("Unable to open /dev/urandom");
         }
-
-        // Initialize the random number generator with the seed
-        std::seed_seq seq{seed};
-        std::mt19937 generator(seq);
+      if (read(fd, & seed, sizeof(seed)) < 0)
+        {
+          fatal("Unable to read from /dev/urandom");
+        }
+      close(fd);
+      srandom(seed);
 #endif
-    } else {
+    }
+  else
+    {
 #ifdef _WIN32
-        srand(seed);
+      srand(seed);
 #else
-        std::mt19937 generator(seed);
+      srandom(seed);
 #endif
     }
 }
 
 uint64_t arch_random()
 {
-    // Create a random number generator with a consistent seed
-    static std::mt19937 generator(42);  // Use any seed value you prefer
-
-    // Use the generator to generate random numbers
-    std::uniform_int_distribution<uint64_t> distribution;
-    return distribution(generator);
+#ifdef _WIN32
+  return rand();
+#else
+  return random();
+#endif
 }
 
 void * xmalloc(size_t size)
